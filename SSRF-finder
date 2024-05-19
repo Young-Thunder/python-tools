@@ -1,0 +1,65 @@
+import requests
+import tkinter as tk
+from tkinter import messagebox, scrolledtext
+
+def send_request(url, payload):
+    try:
+        response = requests.get(url, params=payload, timeout=5)
+        return response
+    except requests.RequestException as e:
+        print(f"Error: {e}")
+        return None
+
+def scan_ssrf(url):
+    results = []
+    test_payloads = [
+        {"url": "http://localhost"},
+        {"url": "http://127.0.0.1"},
+        {"url": "http://169.254.169.254/latest/meta-data/"}  # AWS metadata URL
+    ]
+    
+    for payload in test_payloads:
+        response = send_request(url, payload)
+        if response and response.status_code == 200:
+            results.append(f"Potential SSRF detected with payload: {payload}\nResponse: {response.text[:100]}")
+    
+    return results
+
+def start_scan():
+    url = entry_url.get()
+    if not url:
+        messagebox.showerror("Error", "Please enter a URL to scan.")
+        return
+    
+    results = scan_ssrf(url)
+    result_text.config(state=tk.NORMAL)
+    result_text.delete(1.0, tk.END)
+    
+    if results:
+        for result in results:
+            result_text.insert(tk.END, result + "\n\n")
+    else:
+        result_text.insert(tk.END, "No SSRF vulnerabilities detected.")
+    
+    result_text.config(state=tk.DISABLED)
+
+# GUI setup
+root = tk.Tk()
+root.title("SSRF Vulnerability Scanner")
+
+frame = tk.Frame(root, padx=10, pady=10)
+frame.pack(padx=10, pady=10)
+
+lbl_url = tk.Label(frame, text="Target URL:")
+lbl_url.grid(row=0, column=0, sticky=tk.W)
+
+entry_url = tk.Entry(frame, width=50)
+entry_url.grid(row=0, column=1, padx=10, pady=5)
+
+btn_scan = tk.Button(frame, text="Start Scan", command=start_scan)
+btn_scan.grid(row=0, column=2, padx=10, pady=5)
+
+result_text = scrolledtext.ScrolledText(frame, width=80, height=20, state=tk.DISABLED)
+result_text.grid(row=1, column=0, columnspan=3, pady=10)
+
+root.mainloop()
